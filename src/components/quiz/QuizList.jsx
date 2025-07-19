@@ -19,16 +19,22 @@ import {
   FiChevronRight,
   FiHelpCircle,
   FiCheckCircle,
-  FiBookOpen
+  FiBookOpen,
+  FiCpu,
+  FiZap,
+  FiUpload,
+  FiRefreshCw,
+  FiCalendar
 } from 'react-icons/fi';
-import { FaTrophy } from 'react-icons/fa';
+import { FaTrophy, FaRobot } from 'react-icons/fa';
 
-const QuizList = ({ onTakeQuiz, onCreateQuiz, onViewAttempts, onViewLeaderboard }) => {
+const QuizList = ({ onTakeQuiz, onCreateQuiz, onViewAttempts, onViewLeaderboard, onAIGenerator }) => {
   const { currentUser } = useAuth();
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
   const [userStats, setUserStats] = useState({
     totalAttempts: 0,
     averageScore: 0,
@@ -58,8 +64,7 @@ const QuizList = ({ onTakeQuiz, onCreateQuiz, onViewAttempts, onViewLeaderboard 
 
     const statsQuery = query(
       collection(db, 'quiz-attempts'),
-      where('userId', '==', currentUser.uid),
-      orderBy('completedAt', 'desc')
+      where('userId', '==', currentUser.uid)
     );
 
     const unsubscribe = onSnapshot(statsQuery, (querySnapshot) => {
@@ -69,6 +74,9 @@ const QuizList = ({ onTakeQuiz, onCreateQuiz, onViewAttempts, onViewLeaderboard 
       });
 
       if (attempts.length > 0) {
+        // Sort attempts in JavaScript to avoid index requirement
+        attempts.sort((a, b) => b.completedAt?.toDate() - a.completedAt?.toDate());
+        
         const totalScore = attempts.reduce((sum, attempt) => sum + attempt.percentage, 0);
         const averageScore = Math.round(totalScore / attempts.length);
         const bestScore = Math.max(...attempts.map(attempt => attempt.percentage));
@@ -79,6 +87,13 @@ const QuizList = ({ onTakeQuiz, onCreateQuiz, onViewAttempts, onViewLeaderboard 
           bestScore
         });
       }
+    }, (error) => {
+      console.error('Error loading user stats:', error);
+      setUserStats({
+        totalAttempts: 0,
+        averageScore: 0,
+        bestScore: 0
+      });
     });
 
     return () => unsubscribe();
@@ -93,267 +108,484 @@ const QuizList = ({ onTakeQuiz, onCreateQuiz, onViewAttempts, onViewLeaderboard 
     });
   };
   
-  // Filter quizzes based on search term
-  const filteredQuizzes = quizzes.filter(quiz => 
-    quiz.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    quiz.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter and sort quizzes
+  const filteredAndSortedQuizzes = quizzes
+    .filter(quiz => 
+      quiz.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      quiz.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'newest':
+          return b.createdAt?.toDate() - a.createdAt?.toDate();
+        case 'oldest':
+          return a.createdAt?.toDate() - b.createdAt?.toDate();
+        case 'title':
+          return a.title?.localeCompare(b.title);
+        case 'questions':
+          return (b.totalQuestions || 0) - (a.totalQuestions || 0);
+        default:
+          return 0;
+      }
+    });
+
+  const refreshQuizzes = () => {
+    setLoading(true);
+    // The real-time listener will automatically refresh
+    setTimeout(() => setLoading(false), 1000);
+  };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative w-16 h-16">
+      <div className="flex justify-center items-center min-h-[500px]">
+        <div className="flex flex-col items-center gap-6">
+          <div className="relative w-20 h-20">
             <div className="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin"></div>
-            <div className="absolute inset-2 rounded-full border-4 border-blue-300 border-t-transparent animate-spin animate-delay-150"></div>
+            <div className="absolute inset-3 rounded-full border-4 border-blue-300 border-t-transparent animate-spin animate-reverse"></div>
+            <div className="absolute inset-6 rounded-full border-2 border-blue-200 border-t-transparent animate-spin"></div>
           </div>
-          <p className="text-gray-600 dark:text-gray-400 font-medium">Loading your quizzes...</p>
+          <p className="text-gray-600 dark:text-gray-400 font-medium text-lg">
+            Loading your amazing quizzes...
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-      {/* Hero Section with Glass Effect */}
-      <div className="relative mb-12 overflow-hidden rounded-2xl">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/30 to-purple-600/30 blur-3xl"></div>
-        <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl rounded-2xl shadow-xl p-6 sm:p-10 overflow-hidden">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-8">
+      {/* Hero Section with Enhanced Glass Effect */}
+      <div className="relative mb-12 overflow-hidden rounded-3xl">
+        {/* Animated Background */}
+        <div className="absolute inset-0">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 via-purple-600/20 to-pink-600/20"></div>
+          <div className="absolute top-0 left-1/4 w-72 h-72 bg-blue-500/30 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-0 right-1/4 w-72 h-72 bg-purple-500/30 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        </div>
+        
+        <div className="relative bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 dark:border-gray-700/20 p-8 sm:p-12">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8">
             <div className="flex-1">
-              <h1 className="text-4xl lg:text-5xl font-extrabold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
-                Quiz Library
-              </h1>
-              <p className="text-gray-600 dark:text-gray-300 text-lg max-w-2xl">
-                Discover amazing quizzes, test your knowledge, and challenge yourself to reach the top of the leaderboard.
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-lg">
+                  <FiBookOpen className="w-8 h-8 text-white" />
+                </div>
+                <h1 className="text-4xl lg:text-6xl font-extrabold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                  Quiz Library
+                </h1>
+              </div>
+              <p className="text-gray-600 dark:text-gray-300 text-xl max-w-3xl leading-relaxed">
+                🚀 Discover amazing quizzes, test your knowledge with AI-generated content, 
+                and challenge yourself to reach the top of the leaderboard.
               </p>
+              
+              {/* Quick Stats */}
+              <div className="flex flex-wrap gap-6 mt-6">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span className="text-gray-700 dark:text-gray-300">{quizzes.length} Total Quizzes</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-gray-700 dark:text-gray-300">{userStats.totalAttempts} Your Attempts</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                  <span className="text-gray-700 dark:text-gray-300">{userStats.bestScore}% Best Score</span>
+                </div>
+              </div>
             </div>
             
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            {/* Enhanced Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-stretch gap-4">
               <button
                 onClick={onViewAttempts}
-                className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                className="group flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-2xl hover:from-purple-700 hover:to-pink-700 transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:-translate-y-1"
               >
-                <FiTarget className="w-5 h-5" />
+                <FiTarget className="w-5 h-5 group-hover:scale-110 transition-transform" />
                 My Progress
+              </button>
+              
+              {/* AI Generator Button - Enhanced */}
+              <button
+                onClick={onAIGenerator}
+                className="group flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-2xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:-translate-y-1 relative overflow-hidden"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-indigo-400 to-purple-400 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+                <FaRobot className="w-5 h-5 group-hover:scale-110 transition-transform relative z-10" />
+                <span className="relative z-10">AI Generator</span>
+                <FiZap className="w-4 h-4 text-yellow-300 group-hover:scale-125 transition-transform relative z-10" />
               </button>
               
               <button
                 onClick={onCreateQuiz}
-                className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-green-500 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-green-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                className="group flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-blue-600 to-green-500 text-white font-bold rounded-2xl hover:from-blue-700 hover:to-green-600 transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:-translate-y-1"
               >
-                <FiPlus className="w-5 h-5" />
-                Create New Quiz
+                <FiPlus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
+                Create Quiz
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Stats Cards Section */}
+      {/* Enhanced Stats Cards Section */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-        <div className="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300 border border-blue-100 dark:border-blue-900">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-md">
-              <FiBarChart2 className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {quizzes.length}
+        {[
+          {
+            icon: FiBarChart2,
+            label: "Total Quizzes",
+            value: quizzes.length,
+            color: "blue",
+            gradient: "from-blue-500 to-blue-600"
+          },
+          {
+            icon: FiBookOpen,
+            label: "Created by You",
+            value: quizzes.filter(q => q.createdBy === currentUser.uid).length,
+            color: "green",
+            gradient: "from-green-500 to-green-600"
+          },
+          {
+            icon: FiCheckCircle,
+            label: "Your Attempts",
+            value: userStats.totalAttempts,
+            color: "purple",
+            gradient: "from-purple-500 to-purple-600"
+          },
+          {
+            icon: FiStar,
+            label: "Best Score",
+            value: `${userStats.bestScore}%`,
+            color: "yellow",
+            gradient: "from-yellow-500 to-yellow-600"
+          }
+        ].map((stat, index) => (
+          <div key={index} className="group p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-700 hover:scale-105">
+            <div className="flex items-center gap-4">
+              <div className={`p-3 bg-gradient-to-br ${stat.gradient} rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                <stat.icon className="w-6 h-6 text-white" />
               </div>
-              <div className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                Total Quizzes
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300 border border-green-100 dark:border-green-900">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-md">
-              <FiBookOpen className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                {quizzes.filter(q => q.createdBy === currentUser.uid).length}
-              </div>
-              <div className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                Created by You
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300 border border-purple-100 dark:border-purple-900">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-md">
-              <FiCheckCircle className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                {userStats.totalAttempts}
-              </div>
-              <div className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                Your Attempts
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300 border border-yellow-100 dark:border-yellow-900">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-lg shadow-md">
-              <FiStar className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                {userStats.bestScore}%
-              </div>
-              <div className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                Best Score
+              <div>
+                <div className={`text-2xl font-bold text-${stat.color}-600 dark:text-${stat.color}-400`}>
+                  {stat.value}
+                </div>
+                <div className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                  {stat.label}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        ))}
       </div>
 
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-8">
-        {/* Search Bar */}
-        <div className="relative flex-grow max-w-md">
-          <input
-            type="text"
-            placeholder="Search quizzes..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 bg-white/90 dark:bg-[#172033] rounded-xl border-2 border-gray-300 dark:border-blue-900/60 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 shadow-md text-gray-800 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-          />
-          <FiSearch className="absolute left-4 top-3.5 w-5 h-5 text-gray-500 dark:text-blue-400" />
-        </div>
-
-        {/* Filter Buttons */}
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-5 py-3 rounded-xl font-medium transition-all duration-300 flex items-center gap-2 ${
-              filter === 'all'
-                ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md'
-                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
-            }`}
-          >
-            <FiUsers className="w-4 h-4" />
-            All Quizzes
-          </button>
-          
-          <button
-            onClick={() => setFilter('mine')}
-            className={`px-5 py-3 rounded-xl font-medium transition-all duration-300 flex items-center gap-2 ${
-              filter === 'mine'
-                ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-md'
-                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
-            }`}
-          >
-            <FiUser className="w-4 h-4" />
-            My Quizzes
-          </button>
-        </div>
-      </div>
-
-      {/* Quiz Grid */}
-      {filteredQuizzes.length === 0 ? (
-        <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="mx-auto w-24 h-24 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-6">
-            {searchTerm ? (
-              <FiSearch className="w-10 h-10 text-gray-400" />
-            ) : (
-              <FiHelpCircle className="w-10 h-10 text-gray-400" />
+      {/* Enhanced Search and Filters */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-6">
+          {/* Search Bar with Enhanced Design */}
+          <div className="relative flex-grow max-w-md">
+            <input
+              type="text"
+              placeholder="Search quizzes by title or description..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-gray-700 rounded-xl border-2 border-gray-200 dark:border-gray-600 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-300 text-gray-800 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+            />
+            <FiSearch className="absolute left-4 top-4.5 w-5 h-5 text-gray-400" />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-3.5 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                <FiX className="w-4 h-4 text-gray-400" />
+              </button>
             )}
           </div>
-          <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-            {searchTerm ? 'No matching quizzes found' : filter === 'mine' ? 'No quizzes created yet' : 'No quizzes available'}
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-8 text-lg max-w-md mx-auto">
-            {searchTerm ? 'Try a different search term or clear your search' : 
-             filter === 'mine' ? 'Create your first quiz and share your knowledge!' : 
-             'Be the first to create a quiz and start the learning journey.'}
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Filter Buttons */}
+            <div className="flex gap-2">
+              {[
+                { key: 'all', label: 'All Quizzes', icon: FiUsers, count: quizzes.length },
+                { key: 'mine', label: 'My Quizzes', icon: FiUser, count: quizzes.filter(q => q.createdBy === currentUser.uid).length }
+              ].map(filterOption => (
+                <button
+                  key={filterOption.key}
+                  onClick={() => setFilter(filterOption.key)}
+                  className={`px-5 py-3 rounded-xl font-medium transition-all duration-300 flex items-center gap-2 ${
+                    filter === filterOption.key
+                      ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg scale-105'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <filterOption.icon className="w-4 h-4" />
+                  {filterOption.label}
+                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                    filter === filterOption.key 
+                      ? 'bg-white/20' 
+                      : 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
+                  }`}>
+                    {filterOption.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Sort Dropdown */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl border-2 border-gray-200 dark:border-gray-600 focus:outline-none focus:border-blue-500 transition-all duration-300"
+            >
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="title">By Title</option>
+              <option value="questions">By Questions Count</option>
+            </select>
+
+            {/* Refresh Button */}
+            <button
+              onClick={refreshQuizzes}
+              className="p-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl hover:from-green-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+              title="Refresh Quizzes"
+            >
+              <FiRefreshCw className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Summary */}
+        <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Showing <span className="font-semibold text-blue-600 dark:text-blue-400">{filteredAndSortedQuizzes.length}</span> quiz{filteredAndSortedQuizzes.length !== 1 ? 'es' : ''} 
+            {searchTerm && ` matching "${searchTerm}"`}
           </p>
-          <button
-            onClick={onCreateQuiz}
-            className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-green-600 text-white font-bold text-lg rounded-xl hover:from-blue-700 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
-          >
-            <FiPlus className="w-6 h-6" />
-            Create a Quiz
-          </button>
+          
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
+            >
+              Clear search
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Quiz Grid or Empty State */}
+      {filteredAndSortedQuizzes.length === 0 ? (
+        <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
+          <div className="mx-auto w-32 h-32 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-full flex items-center justify-center mb-8 shadow-inner">
+            {searchTerm ? (
+              <FiSearch className="w-16 h-16 text-gray-400" />
+            ) : (
+              <FiHelpCircle className="w-16 h-16 text-gray-400" />
+            )}
+          </div>
+          
+          <h3 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+            {searchTerm ? 'No matching quizzes found' : 
+             filter === 'mine' ? 'No quizzes created yet' : 
+             'No quizzes available'}
+          </h3>
+          
+          <p className="text-gray-600 dark:text-gray-400 mb-8 text-xl max-w-md mx-auto leading-relaxed">
+            {searchTerm ? 'Try a different search term or explore all available quizzes' : 
+             filter === 'mine' ? 'Create your first quiz using our manual editor or AI generator!' : 
+             'Be the pioneer! Create the first quiz and start the learning journey.'}
+          </p>
+          
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <button
+              onClick={onAIGenerator}
+              className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-lg rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+            >
+              <FaRobot className="w-6 h-6" />
+              Generate with AI
+            </button>
+            
+            <button
+              onClick={onCreateQuiz}
+              className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-green-600 text-white font-bold text-lg rounded-xl hover:from-blue-700 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+            >
+              <FiPlus className="w-6 h-6" />
+              Create Manually
+            </button>
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredQuizzes.map(quiz => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {filteredAndSortedQuizzes.map(quiz => (
             <div 
               key={quiz.id} 
-              className="group bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-700 overflow-hidden"
+              className="group bg-white dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 border border-gray-100 dark:border-gray-700 overflow-hidden transform hover:-translate-y-2 hover:border-blue-300 dark:hover:border-blue-500 flex flex-col h-[420px]"
+              onClick={() => onTakeQuiz(quiz)}
             >
-              <div className="h-2 bg-gradient-to-r from-blue-500 to-purple-500"></div>
-              <div className="p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                    {quiz.title}
-                  </h3>
-                  {quiz.createdBy === currentUser.uid && (
+              {/* Colorful top gradient bar based on category or AI generation */}
+              <div className="h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-teal-500"></div>
+              
+              <div className="relative p-6 flex-1 flex flex-col">
+                {/* Decorative patterns */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 dark:bg-blue-400/10 rounded-full -mt-12 -mr-12 opacity-70"></div>
+                <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-purple-500/5 dark:bg-purple-400/10 rounded-full opacity-70"></div>
+                
+                <div className="relative flex flex-col h-full">
+                  {/* Header with title and badges */}
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        {quiz.createdBy === currentUser.uid && (
+                          <div className="bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                            <FiUser className="w-3 h-3" />
+                            Your Quiz
+                          </div>
+                        )}
+                        {quiz.isAIGenerated && (
+                          <div className="bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                            <FaRobot className="w-3 h-3" />
+                            AI Generated
+                          </div>
+                        )}
+                        <div className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                          <FiClock className="w-3 h-3" />
+                          ~{Math.ceil((quiz.questions?.length || 0) * 1.5)} min
+                        </div>
+                      </div>
+                      
+                      <h3 className="text-xl font-extrabold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-2 leading-tight">
+                        {quiz.title}
+                      </h3>
+                    </div>
+                    
+                    {quiz.createdBy === currentUser.uid && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          console.log('Edit quiz:', quiz.id);
+                        }}
+                        className="p-2 rounded-full text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all duration-300"
+                      >
+                        <FiEdit className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Quiz description */}
+                  <p className="text-gray-600 dark:text-gray-400 mb-6 line-clamp-2 text-sm">
+                    {quiz.description || "Take this quiz to test your knowledge and challenge yourself!"}
+                  </p>
+                  
+                  {/* Enhanced Quiz Meta */}
+                  <div className="flex flex-wrap items-center justify-between gap-y-3 mb-6 pb-6 border-b border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+                        <FiBookOpen className="w-4 h-4" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {quiz.questions?.length || 0} questions
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400">
+                        <FiUser className="w-4 h-4" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {quiz.createdByName || "Anonymous"}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 w-full mt-1">
+                      <div className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
+                        <FiCalendar className="w-4 h-4" />
+                      </div>
+                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                        Created {formatDate(quiz.createdAt)}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Spacer to push buttons to bottom */}
+                  <div className="flex-grow"></div>
+                  
+                  {/* Enhanced Action Buttons - Now at bottom */}
+                  <div className="grid grid-cols-2 gap-3 mt-auto">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        // Edit functionality 
+                        onTakeQuiz(quiz);
                       }}
-                      className="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      className="group flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                     >
-                      <FiEdit className="w-4 h-4" />
+                      <FiPlay className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                      <span>Take Quiz</span>
                     </button>
-                  )}
-                </div>
-                
-                <p className="text-gray-600 dark:text-gray-400 mb-5 line-clamp-2">
-                  {quiz.description || "Take this quiz to test your knowledge!"}
-                </p>
-                
-                <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-gray-500 dark:text-gray-400 mb-5">
-                  <div className="flex items-center gap-1">
-                    <FiClock className="w-4 h-4" />
-                    <span>{quiz.questions?.length || 0} questions</span>
+                    
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewLeaderboard(quiz);
+                      }}
+                      className="group flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-orange-500 to-yellow-500 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-yellow-600 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                    >
+                      <FaTrophy className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                      <span>Leaderboard</span>
+                    </button>
                   </div>
-                  
-                  <div className="flex items-center gap-1">
-                    <FiUser className="w-4 h-4" />
-                    <span>{quiz.createdByName || "Anonymous"}</span>
-                  </div>
-                  
-                  <div className="w-full h-px bg-gray-100 dark:bg-gray-700 my-1"></div>
-                  
-                  <div className="flex items-center gap-1">
-                    <FiClock className="w-4 h-4" />
-                    <span>Created {formatDate(quiz.createdAt)}</span>
-                  </div>
-                </div>
-                
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={() => onTakeQuiz(quiz)}
-                    className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-300"
-                  >
-                    <FiPlay className="w-4 h-4" />
-                    Take Quiz
-                  </button>
-                  
-                  <button
-                    onClick={() => onViewLeaderboard(quiz)}
-                    className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white font-medium rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-300"
-                  >
-                    <FaTrophy className="w-4 h-4" />
-                    Leaderboard
-                  </button>
                 </div>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Call to Action Section */}
+      {filteredAndSortedQuizzes.length > 0 && (
+        <div className="text-center mt-16">
+          <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-900/20 dark:via-indigo-900/20 dark:to-purple-900/20 rounded-3xl p-12 border-2 border-blue-200/50 dark:border-blue-700/50 shadow-2xl backdrop-blur-sm">
+            <div className="max-w-3xl mx-auto">
+              <div className="flex items-center justify-center gap-4 mb-6">
+                <div className="p-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-lg">
+                  <FiZap className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-4xl font-bold text-gray-900 dark:text-white">
+                  Ready to Create Something Amazing?
+                </h3>
+              </div>
+              
+              <p className="text-gray-600 dark:text-gray-400 text-xl mb-10 leading-relaxed">
+                🤖 Use our AI-powered generator for instant quiz creation, or craft your own with our intuitive manual editor. 
+                Share your expertise and build a community of learners!
+              </p>
+              
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+                <button
+                  onClick={onAIGenerator}
+                  className="group inline-flex items-center gap-4 px-10 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-xl rounded-2xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:-translate-y-1"
+                >
+                  <FaRobot className="w-7 h-7 group-hover:scale-110 transition-transform" />
+                  AI Quiz Generator
+                  <FiZap className="w-5 h-5 text-yellow-300" />
+                </button>
+                
+                <button
+                  onClick={onCreateQuiz}
+                  className="group inline-flex items-center gap-4 px-10 py-5 bg-gradient-to-r from-blue-600 to-green-600 text-white font-bold text-xl rounded-2xl hover:from-blue-700 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:-translate-y-1"
+                >
+                  <FiEdit className="w-7 h-7 group-hover:scale-110 transition-transform" />
+                  Manual Creator
+                </button>
+                
+                <button
+                  onClick={onViewAttempts}
+                  className="inline-flex items-center gap-4 px-10 py-5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold text-xl rounded-2xl border-2 border-gray-300 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl"
+                >
+                  <FiBarChart2 className="w-7 h-7" />
+                  View Progress
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
